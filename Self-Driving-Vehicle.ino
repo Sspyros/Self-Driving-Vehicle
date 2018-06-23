@@ -67,7 +67,7 @@ float prevYpr=999,distance, distC = 0, distL = 0,distR = 0, phiG, phiC, phiCinR;
 double Setpoint = 0, Input, Output;
 
 //Initialize starting vehicle position and goal in cm
-float x = 0,		y = 0,		xG = -350,		yG = -150;
+float x = 0,		y = 0,		xG = -250,		yG = 0;
 
 //Initializations
 Servo leftServo;
@@ -134,8 +134,6 @@ void setup() {
   
   irrecv.enableIRIn();
   
-	//Temporary
-  //phiG = readCompass() * 180/M_PI; 
   Serial.println("===================== READY =====================");
 }
 
@@ -148,14 +146,7 @@ void loop() {
   
   if(us_sensor.isFinished()){
     distToObsRaw = us_sensor.getRange();
-    //Simple running average
-//    distToObs = 0.9 * distToObsRaw + 0.1 * distToObs;
-//    Serial.print("Raw: ");
-//    Serial.print(distToObsRaw);
-//    Serial.print(" Avg: ");
-//    Serial.println(distToObs);
     usReadings.add(distToObsRaw);
-//    Serial.println(usReadings.getMedian());
     distToObs = usReadings.getMedian();
     us_sensor.start();
   }
@@ -163,7 +154,6 @@ void loop() {
   phiCinR = readCompass();
   phiC = phiCinR * 180/M_PI;
 
-  //Serial.println(subAngles(90, subAngles(phiG,phiC)));
   leftServo.write(subAngles(90, subAngles(phiG,phiC)));
   
   distR = 1.1 * (Rcounter - lastRTick); // 2 * pi * R / 20
@@ -176,9 +166,7 @@ void loop() {
   lastRTick = Rcounter;
   lastLTick = Lcounter;
   
-  //distC = 0.55 * (deltaR + deltaL);  //shortest calcualtion 
-  phiG = (atan2((xG - x), (yG - y)) * 180 / M_PI);
-//  if (phiG <180) phiG = (phiG + 360) % 360; //typechange might be wrong
+  phiG = (int)(90 - atan2((yG - y),(xG - x)) * 180 / M_PI)%360;
   if ( phiG < 0 ) phiG = phiG + 360;
   distToGoal = sqrt(sq(xG - x) + sq(yG - y));
   
@@ -255,12 +243,11 @@ void loop() {
     if ( !turnRight ) Input = (distToObs*subAngles(phiG, phiC) + (100 - distToObs)*subAngles(phiC, phiG + 90) )/100; //left
     if ( turnRight ) Input = (distToObs*subAngles(phiG, phiC) + (100 - distToObs)*subAngles(phiC, subAngles(phiG, 90)) )/100; //right
     
-    //Input = phiG - (phiC * 180/M_PI);
     myPID.Compute();
     digitalWrite(13, HIGH);
 
     if ( moving == 1){
-      if ( debug ) Serial.print("--");
+      //if ( debug ) Serial.print("--");
       speedB = midSpeed + (int)Output;
       speedA = midSpeed - (int)Output;
       digitalWrite(in1, HIGH);
@@ -273,7 +260,6 @@ void loop() {
    }  
 	}	else {
 		//no obs ahead, go to goal
-		//Input = phiG - (phiC * 180/M_PI);
     InputMedian.add(subAngles (phiG, phiC));
     Input = InputMedian.getAverage();
     digitalWrite(13, LOW);
@@ -281,7 +267,7 @@ void loop() {
     myPID.Compute();
     
     if ( moving == 1){
-      if ( debug ) Serial.print("++");
+      //if ( debug ) Serial.print("++");
       speedB = midSpeed + (int)Output;
       speedA = midSpeed - (int)Output;
       digitalWrite(in1, HIGH);
@@ -297,8 +283,6 @@ void loop() {
  
   if (movingManual == 1){
     if (millis() - startTime < 100){
-      //Serial.println("Moving manually...");
-      //printStuff();
       Serial.print(Rcounter);
       Serial.print(" L: ");
       Serial.println(Lcounter);
@@ -337,7 +321,6 @@ void goRight(){
   digitalWrite(in2, LOW);
   analogWrite(enA, midSpeed);
   analogWrite(enB, 0);
-  
 }
 void goLeft(){
   digitalWrite(in1, LOW);
@@ -347,7 +330,6 @@ void goLeft(){
   analogWrite(enA, 0);
   analogWrite(enB, midSpeed);
 }
-
 void stopAll(){
 	digitalWrite(in1, LOW);
   digitalWrite(in2, LOW);
@@ -363,7 +345,6 @@ void Rcount(){
 void Lcount(){
 	Lcounter++;
 }
-
 
 int adjustSpeed(int speeed){
   if (speeed < 0){
@@ -385,71 +366,68 @@ float subAngles(float a, float b){
   return ans;
 }
 
-//int readCompass(void)
 float readCompass(void)
 {
   compass.getEvent(&compass_event);    
   float heading = atan2(compass_event.magnetic.y, compass_event.magnetic.x); //+ DEC_ANGLE;
 	if(heading < 0) heading += 2*M_PI;
 	if(heading > 2*M_PI) heading -= 2*M_PI;
-	//float headingDegrees = heading * 180/M_PI;
   float headingDegrees = heading;
-	//return ((int)headingDegrees);
   return headingDegrees;
 }
 
 void printStuff(){
 	printMillis = millis();
-	Serial.print("Phi: ");
-  Serial.print(phiC);
-	Serial.print(" -> ");
-  Serial.print(phiG);
-  Serial.print(" x: ");
-  Serial.print(x);
-  Serial.print(" -> ");
-  Serial.print(xG);
-  Serial.print(" y: ");
-  Serial.print(y);
-  Serial.print(" -> ");
-  Serial.print(yG);
-  Serial.print(" distG: ");
-  Serial.print(distToGoal);
-  Serial.print(" distO: ");
-  Serial.print(distToObs);
-  if ( turnRight ){
-    Serial.print(" Go Right ");
-  } else {
-    Serial.print(" Go Left ");
-  }
-	Serial.print(" Input: ");
-	Serial.print(Input);
-  Serial.print(" Out: ");
-  Serial.print(Output);
-	Serial.print(" Speed A: ");
-	Serial.print(adjustSpeed(speedA));
-	Serial.print(" B: ");
-	Serial.println(adjustSpeed(speedB));
-/*	Serial.print("Right:");
-	Serial.print(Rcounter); 
-	Serial.print("  ");
-	Serial.print("Left:"); 
-	Serial.println(Lcounter); */
-}
+//	Serial.print("Phi: ");
+//  Serial.print(" ");
+//  Serial.print(phiC);
+//	Serial.print(" -> ");
+//  Serial.print(phiG);
+//  Serial.print(" x: ");
+//  Serial.print(x);
+//  Serial.print(" -> ");
+//  Serial.print(xG);
+//  Serial.print(" y: ");
+//  Serial.print(y);
+//  Serial.print(" -> ");
+//  Serial.print(yG);
+//  Serial.print(" distG: ");
+//  Serial.print(distToGoal);
+//  Serial.print(" distO: ");
+//  Serial.print(distToObs);
+//  if ( turnRight ){
+//    Serial.print(" Go Right ");
+//  } else {
+//    Serial.print(" Go Left ");
+//  }
+//	Serial.print(" Input: ");
+//	Serial.print(Input);
+//  Serial.print(" Out: ");
+//  Serial.print(Output);
+//	Serial.print(" Speed A: ");
+//	Serial.print(adjustSpeed(speedA));
+//	Serial.print(" B: ");
+//	Serial.println(adjustSpeed(speedB));
 
-//  if (Rcounter != lastRcounter) {
-//    lastRcounter = Rcounter;
-//    Rvalue_tmp++;
-//  if (Rvalue_tmp == (Rvalue +2)) {
-//      Rvalue++;
-//      Rvalue_tmp--;
-//    }
-//  }
-//  
-//  if (Lcounter != lastLcounter) {
-//    lastLcounter = Lcounter;
-//    Lvalue_tmp++;
-//    if (Lvalue_tmp == (Lvalue +2)) {
-//      Lvalue++;
-//      Lvalue_tmp--;
-//    }
-//  }
+  
+
+  Serial.print(phiC);
+  Serial.print(" ");
+  Serial.print(phiG);
+  Serial.print(" ");
+  Serial.print(x);
+  Serial.print(" ");
+  Serial.print(xG);
+  Serial.print(" ");
+  Serial.print(y);
+  Serial.print(" ");
+  Serial.print(yG);
+  Serial.print(" ");
+  Serial.print(distToGoal);
+  Serial.print(" ");
+  Serial.print(distToObs);
+  Serial.print(" ");
+  Serial.print(Input);
+  Serial.print(" ");
+  Serial.println(Output);
+}
